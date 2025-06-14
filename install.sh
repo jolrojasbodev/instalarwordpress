@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # --- VARIABLES ---
-# Las variables de tu playbook de Ansible se traducen aquí.
-# ¡IMPORTANTE! Ajusta estas variables si cambian en tu entorno.
+# Ajusta estas variables si cambian en tu entorno.
 DB_NAME="wordpress"
 DB_USER="wordpress"
 DB_PASS="wordpress"
@@ -10,10 +9,7 @@ DB_SERVER="localhost" # Esto asume que MySQL está en el mismo servidor
 
 WP_DIR="/srv/www/wordpress"
 
-# --- CAMBIO CLAVE PARA HACER LA URL DINÁMICA ---
-# Detecta la primera dirección IP del servidor
-# Esto es más dinámico que una IP fija y funciona bien para entornos de prueba o VM.
-# Para producción, podrías considerar un nombre de dominio.
+# Detecta la primera dirección IP del servidor para una URL dinámica.
 SERVER_IP=$(hostname -I | awk '{print $1}')
 SITIO_URL="http://${SERVER_IP}" # Construye la URL con la IP detectada
 
@@ -48,7 +44,7 @@ restart_nginx() {
     sudo systemctl restart nginx || handle_error "Fallo al reiniciar Nginx"
 }
 
-# Nombre del servicio PHP-FPM para Ubuntu 24.04 (ajusta a php7.2-fpm para Ubuntu 18.04)
+# Nombre del servicio PHP-FPM para Ubuntu 24.04 (usa php7.2-fpm para Ubuntu 18.04)
 restart_phpfpm() {
     echo "Reiniciando PHP-FPM (php8.3-fpm)..."
     sudo systemctl restart php8.3-fpm || handle_error "Fallo al reiniciar PHP-FPM (php8.3-fpm)"
@@ -77,7 +73,8 @@ echo "Actualizando lista de paquetes..."
 sudo apt update || handle_error "Fallo al actualizar los paquetes"
 
 # Instalar paquetes
-# Asegúrate de que los paquetes PHP coincidan con tu versión de Ubuntu (php8.3-fpm para 24.04, php7.2-fpm para 18.04)
+# Se especifican los paquetes PHP para Ubuntu 24.04 (PHP 8.3).
+# Si usas Ubuntu 18.04, cambia 'php8.3-' por 'php7.2-'
 echo "Instalando paquetes necesarios: Nginx, PHP-FPM, MySQL, y otros..."
 sudo apt install -y nginx \
 php8.3-fpm \
@@ -106,7 +103,7 @@ sudo systemctl start mysql || handle_error "Fallo al iniciar MySQL"
 sudo systemctl enable mysql || handle_error "Fallo al habilitar MySQL"
 
 # Asegurar que PHP-FPM esté iniciado y habilitado
-# Asegúrate de que el servicio PHP-FPM coincida con tu versión de Ubuntu (php8.3-fpm para 24.04, php7.2-fpm para 18.04)
+# El servicio PHP-FPM para Ubuntu 24.04 es php8.3-fpm. (Para 18.04, sería php7.2-fpm)
 echo "Asegurando que PHP-FPM esté iniciado y habilitado..."
 sudo systemctl start php8.3-fpm || handle_error "Fallo al iniciar PHP-FPM"
 sudo systemctl enable php8.3-fpm || handle_error "Fallo al habilitar PHP-FPM"
@@ -204,9 +201,12 @@ if [ -f /etc/nginx/sites-enabled/default ]; then
     restart_nginx
 fi
 
-# Copiar archivo wordpress.conf
-echo "Copiando archivo nginx.conf al destino..."
-sudo cp ./data/nginx.conf /etc/nginx/sites-available/wordpress.conf || handle_error "Fallo al copiar nginx.conf"
+# Copiar archivo wordpress.conf y reemplazar la IP dinámica
+echo "Copiando archivo nginx.conf al destino y reemplazando IP dinámica..."
+# Leemos el contenido del archivo nginx.conf, reemplazamos el placeholder
+# con la IP detectada y luego lo guardamos en el destino.
+sed "s|{{SERVER_IP_PLACEHOLDER}}|$SERVER_IP|g" ./data/nginx.conf | sudo tee /etc/nginx/sites-available/wordpress.conf > /dev/null || handle_error "Fallo al copiar y adecuar nginx.conf"
+
 sudo chmod "$FILE_PERMISSIONS" /etc/nginx/sites-available/wordpress.conf || handle_error "Fallo al ajustar permisos de nginx.conf"
 restart_nginx
 
@@ -220,7 +220,7 @@ echo "Asegurando que Nginx esté iniciado y habilitado..."
 sudo systemctl start nginx || handle_error "Fallo al iniciar Nginx"
 sudo systemctl enable nginx || handle_error "Fallo al habilitar Nginx"
 
-# Copiar archivo wp-config.php
+# Copiar archivo wp-config.php (con claves de seguridad integradas)
 echo "Copiando archivo wp-config.php al directorio de WordPress..."
 sudo cp ./data/wp-config.php "$WP_DIR"/wp-config.php || handle_error "Fallo al copiar wp-config.php"
 sudo chown www-data:www-data "$WP_DIR"/wp-config.php || handle_error "Fallo al cambiar propietario de wp-config.php"
