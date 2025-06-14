@@ -91,7 +91,6 @@ php8.3-soap \
 php8.3-bcmath \
 php8.3-imagick \
 php8.3-intl \
-php8.3-json \
 php8.3-zip \
 mysql-server \
 unzip \
